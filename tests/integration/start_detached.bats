@@ -26,8 +26,13 @@ function teardown() {
 
   # replace "uid": 0 with "uid": 1000
   # and do a similar thing for gid.
-  sed -i 's;"uid": 0;"uid": 1000;g' config.json
-  sed -i 's;"gid": 0;"gid": 100;g' config.json
+  cat "config.json" \
+	| jq '(.. | select(.uid? == 0)) .uid |= 1000' \
+	| jq '(.. | select(.gid? == 0)) .gid |= 100' \
+	>"config.json.tmp"
+  mv "config.json"{.tmp,}
+
+
 
   # run busybox detached
   runc run -d --console-socket $CONSOLE_SOCKET test_busybox

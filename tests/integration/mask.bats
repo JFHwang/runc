@@ -11,7 +11,12 @@ function setup() {
 	echo "Forbidden information!" > rootfs/testfile
 
 	# add extra masked paths
-	sed -i 's;"maskedPaths": \[;"maskedPaths": \["/testdir","/testfile",;g' config.json
+	cat "config.json" \
+		| jq '(.. | select(.maskedPaths? != null)) .maskedPaths += ["/testdir", "/testfile"]' \
+		>"config.json.tmp"
+	mv "config.json"{.tmp,}
+
+
 }
 
 function teardown() {

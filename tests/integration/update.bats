@@ -16,29 +16,14 @@ function setup() {
     set_cgroups_path "$BUSYBOX_BUNDLE"
 
     # Set some initial known values
-    DATA=$(cat <<EOF
-    "memory": {
-        "limit": 33554432,
-        "reservation": 25165824
-    },
-    "cpu": {
-        "shares": 100,
-        "quota": 500000,
-        "period": 1000000,
-        "cpus": "0"
-    },
-    "pids": {
-        "limit": 20
-    }
-EOF
-    )
-    DATA=$(echo ${DATA} | sed 's/\n/\\n/g')
-    if grep -qw \"resources\" ${BUSYBOX_BUNDLE}/config.json; then
-        sed -i "s/\(\"resources\": {\)/\1\n${DATA},/" ${BUSYBOX_BUNDLE}/config.json
-    else
-        sed -i "s/\(\"linux\": {\)/\1\n\"resources\": {${DATA}},/" ${BUSYBOX_BUNDLE}/config.json
-    fi
+    cat "${BUSYBOX_BUNDLE}/config.json" \
+	| jq '.linux.resources.memory |= {"limit": 33554432, "reservation": 25165824}' \
+	| jq '.linux.resources.cpu |= {"shares": 100, "quota": 500000, "period": 1000000, "cpus": "0"}' \
+	| jq '.linux.resources.pids |= {"limit": 20}' \
+	>"${BUSYBOX_BUNDLE}/config.json.tmp"
+    mv "${BUSYBOX_BUNDLE}/config.json"{.tmp,}
 }
+
 
 # Tests whatever limits are (more or less) common between cgroup
 # v1 and v2: memory/swap, pids, and cpuset.

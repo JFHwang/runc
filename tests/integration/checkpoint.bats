@@ -16,8 +16,13 @@ function teardown() {
 
 function setup_pipes() {
 	# The changes to 'terminal' are needed for running in detached mode
-	sed -i 's;"terminal": true;"terminal": false;' config.json
-	sed -i 's/"sh"/"sh","-c","for i in `seq 10`; do read xxx || continue; echo ponG $xxx; done"/' config.json
+	cat "config.json" \
+		| jq '(.. | select(.terminal? != null)) .terminal |= false' \
+		| jq '(.. | select(.[]? == "sh")) += ["-c", "for i in `seq 10`; do read xxx || continue; echo ponG $xxx; done"]' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+
+
 
 	# Create two sets of pipes
 	# for stdout/stderr
@@ -76,7 +81,12 @@ function simple_cr() {
   requires cgroups_v1
 
   # enable CGROUPNS
-  sed -i 's|\("namespaces": \[\)|\1\n\t\t\t{"type": "cgroup"},|' config.json
+  cat "config.json" \
+	| jq '.linux.namespaces += [{"type": "cgroup"}]' \
+	>"config.json.tmp"
+  mv "config.json"{.tmp,}
+
+
 
   simple_cr
 }
@@ -134,7 +144,12 @@ function simple_cr() {
   setup_pipes
 
   # This should not be necessary: https://github.com/checkpoint-restore/criu/issues/575
-  sed -i 's;"readonly": true;"readonly": false;' config.json
+  cat "config.json" \
+  	| jq '(.. | select(.readonly? != null)) .readonly |= false' \
+	>"config.json.tmp"
+  mv "config.json"{.tmp,}
+
+
 
   # TCP port for lazy migration
   port=27277
@@ -218,7 +233,13 @@ function simple_cr() {
   ns_inode=`ls -iL $ns_path | awk '{ print $1 }'`
 
   # tell runc which network namespace to use
-  sed -i "s;\"type\": \"network\";\"type\": \"network\",\"path\": \"$ns_path\";" config.json
+  cat "config.json" \
+  	| jq '(.. | select(.type? == "network")) .path |= "'"$ns_path"'"' \
+	>"config.json.tmp"
+  mv "config.json"{.tmp,}
+
+
+
 
   runc run -d --console-socket $CONSOLE_SOCKET test_busybox
   [ "$status" -eq 0 ]
@@ -268,7 +289,12 @@ function simple_cr() {
   tmplog2=`basename $tmplog2`
   # This adds the annotation 'org.criu.config' to set a container
   # specific CRIU config file.
-  sed -i "s;\"process\";\"annotations\":{\"org.criu.config\": \"$tmp\"},\"process\";" config.json
+  cat "config.json" \
+	| jq '.annotations += {"org.criu.config": "'"$tmp"'"}' \
+	>"config.json.tmp"
+  mv "config.json"{.tmp,}
+
+
   # Tell CRIU to use another configuration file
   mkdir -p /etc/criu
   echo "log-file=$tmplog1" > /etc/criu/default.conf

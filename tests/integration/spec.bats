@@ -37,7 +37,11 @@ function teardown() {
   [[ "${output}" == *"sh"* ]]
 
   # change the default args parameter from sh to hello
-  sed -i 's;"sh";"/hello";' config.json
+  cat "config.json" \
+	| jq '(.. | select(.? == "sh")) |= "/hello"' \
+	>"config.json.tmp"
+  mv "config.json"{.tmp,}
+
 
   # ensure the generated spec works by running hello-world
   runc run test_hello
@@ -58,7 +62,11 @@ function teardown() {
   [ -e "$HELLO_BUNDLE"/config.json ]
 
   # change the default args parameter from sh to hello
-  sed -i 's;"sh";"/hello";' "$HELLO_BUNDLE"/config.json
+  cat "$HELLO_BUNDLE/config.json" \
+	| jq '(.. | select(.? == "sh")) |= "/hello"' \
+	>"$HELLO_BUNDLE/config.json.tmp"
+  mv "$HELLO_BUNDLE/config.json"{.tmp,}
+
 
   # ensure the generated spec works by running hello-world
   runc run --bundle "$HELLO_BUNDLE" test_hello

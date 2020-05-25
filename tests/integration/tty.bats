@@ -13,7 +13,12 @@ function teardown() {
 
 @test "runc run [tty ptsname]" {
 	# Replace sh script with readlink.
-    sed -i 's|"sh"|"sh", "-c", "for file in /proc/self/fd/[012]; do readlink $file; done"|' config.json
+	cat "config.json" \
+		| jq '(.. | select(.[]? == "sh")) += ["-c", "for file in /proc/self/fd/[012]; do readlink $file; done"]' \
+		>"config.json.tmp"
+ 	mv "config.json"{.tmp,}
+
+
 
 	# run busybox
 	runc run test_busybox
@@ -29,11 +34,17 @@ function teardown() {
 	[[ "$ROOTLESS" -ne 0 ]] && requires rootless_idmap
 
 	# Replace sh script with stat.
-	sed -i 's/"sh"/"sh", "-c", "stat -c %u:%g $(tty) | tr : \\\\\\\\n"/' config.json
+	cat "config.json" \
+ 		| jq '(.. | select(.[]?=="sh")) += ["-c", "stat -c %u:%g $(tty) | tr : \\\\n"]' \
+		>"config.json.tmp"
+	mv "config.json"{.tmp,}
+
+
 
 	# run busybox
 	runc run test_busybox
 	[ "$status" -eq 0 ]
+
 	[[ ${lines[0]} =~ 0 ]]
 	# This is set by the default config.json (it corresponds to the standard tty group).
 	[[ ${lines[1]} =~ 5 ]]
@@ -43,13 +54,18 @@ function teardown() {
 	# tty chmod is not doable in rootless containers without idmap.
 	[[ "$ROOTLESS" -ne 0 ]] && requires rootless_idmap
 
+
 	# replace "uid": 0 with "uid": 1000
 	# and do a similar thing for gid.
-	sed -i 's;"uid": 0;"uid": 1000;g' config.json
-	sed -i 's;"gid": 0;"gid": 100;g' config.json
-
 	# Replace sh script with stat.
-	sed -i 's/"sh"/"sh", "-c", "stat -c %u:%g $(tty) | tr : \\\\\\\\n"/' config.json
+	cat "config.json" \
+  		| jq '(.. | select(.uid? == 0)) .uid |= 1000' \
+  		| jq '(.. | select(.gid? == 0)) .gid |= 100' \
+		| jq '(.. | select(.[]? == "sh")) += ["-c", "stat -c %u:%g $(tty) | tr : \\\\n"]' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+
+
 
 	# run busybox
 	runc run test_busybox
@@ -100,8 +116,13 @@ function teardown() {
 
 	# replace "uid": 0 with "uid": 1000
 	# and do a similar thing for gid.
-	sed -i 's;"uid": 0;"uid": 1000;g' config.json
-	sed -i 's;"gid": 0;"gid": 100;g' config.json
+	cat "config.json" \
+  		| jq '(.. | select(.uid? == 0)) .uid |= 1000' \
+  		| jq '(.. | select(.gid? == 0)) .gid |= 100' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+
+
 
 	# run busybox detached
 	runc run -d --console-socket $CONSOLE_SOCKET test_busybox
@@ -119,7 +140,11 @@ function teardown() {
 
 @test "runc exec [tty consolesize]" {
 	# allow writing to filesystem
-	sed -i 's/"readonly": true/"readonly": false/' config.json
+	cat "config.json" \
+		| jq '(.. | select(.readonly? != null)) .readonly |= false' \
+		>"config.json.tmp"
+ 	mv "config.json"{.tmp,}
+
 
 	# run busybox detached
 	runc run -d --console-socket $CONSOLE_SOCKET test_busybox
@@ -176,9 +201,15 @@ EOF
 
 @test "runc create [terminal=false]" {
 	# Disable terminal creation.
-	sed -i 's|"terminal": true,|"terminal": false,|g' config.json
 	# Replace sh script with sleep.
-    sed -i 's|"sh"|"sleep", "1000s"|' config.json
+	cat "config.json" \
+		| jq '(.. | select(.terminal? != null)) .terminal |= false' \
+		| jq '(.. | select(.[]? == "sh")) += ["sleep", "1000s"]' \
+		| jq 'del(.. | select(.? == "sh"))' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+
+
 
 	# Make sure that the handling of detached IO is done properly. See #1354.
 	__runc create test_busybox
@@ -196,9 +227,15 @@ EOF
 
 @test "runc run [terminal=false]" {
 	# Disable terminal creation.
-	sed -i 's|"terminal": true,|"terminal": false,|g' config.json
 	# Replace sh script with sleep.
-    sed -i 's|"sh"|"sleep", "1000s"|' config.json
+	cat "config.json" \
+		| jq '(.. | select(.terminal? != null)) .terminal |= false' \
+		| jq '(.. | select(.[]? == "sh")) += ["sleep", "1000s"]' \
+		| jq 'del(.. | select(.? == "sh"))' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+
+
 
 	# Make sure that the handling of non-detached IO is done properly. See #1354.
 	(
@@ -215,9 +252,15 @@ EOF
 
 @test "runc run -d [terminal=false]" {
 	# Disable terminal creation.
-	sed -i 's|"terminal": true,|"terminal": false,|g' config.json
 	# Replace sh script with sleep.
-    sed -i 's|"sh"|"sleep", "1000s"|' config.json
+	cat "config.json" \
+		| jq '(.. | select(.terminal? != null)) .terminal |= false' \
+		| jq '(.. | select(.[]? == "sh")) += ["sleep", "1000s"]' \
+		| jq 'del(.. | select(.? == "sh"))' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+
+
 
 	# Make sure that the handling of detached IO is done properly. See #1354.
 	__runc run -d test_busybox

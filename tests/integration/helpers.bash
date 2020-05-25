@@ -155,7 +155,11 @@ function init_cgroup_paths() {
 function set_cgroups_path() {
   bundle="${1:-.}"
   init_cgroup_paths
-  sed -i 's#\("linux": {\)#\1\n    "cgroupsPath": "'"${OCI_CGROUPS_PATH}"'",#' "$bundle/config.json"
+  cat "$bundle/config.json" \
+	| jq '.linux.cgroupsPath |= "'"${OCI_CGROUPS_PATH}"'"' \
+	>"$bundle/config.json.tmp"
+  mv "$bundle/config.json"{.tmp,}
+	
 }
 
 # Helper to check a value in cgroups.
@@ -194,7 +198,11 @@ function check_systemd_value() {
 # Helper function to set a resources limit
 function set_resources_limit() {
   bundle="${1:-.}"
-  sed -i 's/\("linux": {\)/\1\n   "resources": { "pids": { "limit": 100 } },/'  "$bundle/config.json"
+  cat "$bundle/config.json" \
+  	| jq '.linux.resources.pids.limit |= 100' \
+  	>"$bundle/config.json.tmp"
+  mv "$bundle/config.json"{.tmp,}
+
 }
 
 # Fails the current test, providing the error given.
@@ -404,7 +412,12 @@ function setup_hello() {
 	tar --exclude './dev/*' -C "$HELLO_BUNDLE"/rootfs -xf "$HELLO_IMAGE"
 	cd "$HELLO_BUNDLE"
 	runc_spec
-	sed -i 's;"sh";"/hello";' config.json
+	cat "config.json" \
+		| jq '(.. | select(.? == "sh")) |= "/hello"' \
+		>"config.json.tmp"
+  	mv "config.json"{.tmp,}
+	
+	
 }
 
 function teardown_running_container() {
